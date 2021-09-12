@@ -2,12 +2,14 @@ export const SchemaParserRegExps = {
   paramSplitter: ':',
   conditionSplitter: '.',
   // selectByKeyValue: /\s*=>\s*/g,
-  paramConnector: /\s*&\s*/g
+  paramConnector: /\s*&\s*/g,
+  rangeParamConnector: /\s*-\s*/g,
 };
 
 export interface DataTypeInput {
   dataType: string
   specificType: string
+  specificTypeProperty?: string
 }
 
 export interface ParsedGetterInput {
@@ -26,20 +28,45 @@ export interface KeyWithParsedTypeAndGetter extends TypeAndGetter {
 }
 
 const SchmeaParser = {
-  parseDataType(dataTypeStr: string) {
+  parseDataType(dataTypeStr: string): DataTypeInput {
+    let res: DataTypeInput = {
+      dataType: '',
+      specificType: '',
+      specificTypeProperty: undefined,
+    };
+
     const devided = dataTypeStr.split(SchemaParserRegExps.paramSplitter);
     const [
       dataType,
-      specificType,
+      rawSpecificType,
     ] = devided;
+    res.dataType = dataType;
+
+    if(rawSpecificType) {
+      const [
+        specificType,
+        specificTypeProperty,
+      ] = rawSpecificType.split(SchemaParserRegExps.conditionSplitter);
+
+      res = {
+        ...res,
+        specificType,
+        specificTypeProperty,
+      };
+    }
     
-    return ({
-      dataType,
-      specificType,
-    });
+    return res;
   },
 
-  parseGetter(getterInput: string | any[]): ParsedGetterInput {
+  parseGetter(getterInput: string | any[] | undefined): ParsedGetterInput {
+    if(!getterInput) {
+      return ({
+        type: 'get',
+        condition: 'default',
+        param: '',
+      });
+    }
+
     if(Array.isArray(getterInput)) {
       return ({
         type: 'get',
@@ -73,6 +100,22 @@ const SchmeaParser = {
     return ({
       key,
       otherResolverKey,
+    });
+  },
+
+  parseRangeParam(paramStr = '1-100'): {
+    min: number, max: number
+  } {
+    const [
+      min,
+      max,
+    ] = paramStr.split(
+      SchemaParserRegExps.rangeParamConnector
+    ).map(str => str.trim());
+
+    return ({
+      min: Number(min),
+      max: Number(max),
     });
   },
 

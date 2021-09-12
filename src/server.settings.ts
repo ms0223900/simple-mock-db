@@ -15,6 +15,17 @@ const routes: SingleRoute[] = [
     pathName: 'Article',
     reqFn: (req) => 
       !Number.isNaN(Number(req.params.id)) ? Number(req.params.id) : undefined,
+    schema: {
+      id: [
+        'number:seq', 'get.eq:idx',
+      ],
+      title: [
+        'string',
+      ],
+      content: [
+        'string',
+      ]
+    }
   } as SingleRoute<number>,
   {
     path: '/game/:id?',
@@ -39,12 +50,12 @@ const routes: SingleRoute[] = [
     }
   },
   {
-    path: '/user',
+    path: '/user/:id?',
     pathName: 'User',
     schema: {
       id: ['number:seq', 'get.eq:idx'],
       name: ['string:lorem', 'get.limit:5-10'],
-      intro: ['string', [
+      intro: ['string:list', [
         'abc',
         'cde',
         'efg',
@@ -52,11 +63,11 @@ const routes: SingleRoute[] = [
       email: ['string:email', 'get.limit:6-10'],
       profile: [
         'object:Profile', // dataType:specificType
-        'find.eq: id & userId',
+        'find.eq: id & userId', // getter(type, condition, param)
       ],
       sharedArticleList: [
-        'array:Article.id',
-        'get.random:2-10'
+        'array:Article',
+        'get.random:2-5' // get randomily(choose 2 ~ 10, )
       ]
     }
   }

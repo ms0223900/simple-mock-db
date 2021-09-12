@@ -9,6 +9,7 @@ import getParamsLackParams from './utils/getParamsLackParams';
 import compareParamValue from './utils/compareParamValue';
 import Resolver from './utils/Resolver';
 import SchmeaParser from './utils/SchemaParser';
+import { MAX_DATA_LIST_AMOUNT } from './config';
 
 const port = process.env.PORT || 3000;
 const server = jsonServer.create();
@@ -61,7 +62,7 @@ const makeServerHomepage = (routes: SingleRoute[]) => {
 const registerServerHandlers = () => {
   const homepageStr = makeServerHomepage(routes);
   const homepage = routes.find(r => r.path === '/');
-  let allResolvers: Record<string, any> = {};
+  let allResolvers: Record<string, Resolver<any>> = {};
 
   routes.forEach(({
     path,
@@ -74,8 +75,8 @@ const registerServerHandlers = () => {
       async get() {
         const parsedPath = parsePath(path);
         return await asyncGetStaticData(parsedPath.path);
-      }
-    };
+      } 
+    } as unknown as Resolver<any>;
     // console.log(resolver);
     allResolvers = {
       ...allResolvers,
@@ -106,7 +107,9 @@ const registerServerHandlers = () => {
       } else {
         const {
           params,
+          query,
         } = req;
+        // console.log(query);
 
         const parsedPath = parsePath(path);
         const lackParams = getParamsLackParams(params, parsedPath.params);
@@ -115,7 +118,9 @@ const registerServerHandlers = () => {
         }
         
         // const data = await asyncGetStaticData(parsedPath.path, res);
-        const data = await allResolvers[pathName].get(allResolvers);
+        let amount = (query.limit && !Number.isNaN(Number(query.limit))) ? Number(query.limit) : undefined;
+        amount = (amount === -1) ? MAX_DATA_LIST_AMOUNT : amount;
+        const data = await allResolvers[pathName].get(allResolvers, amount);
 
         if(data) {
           const haveParams = Object.keys(params).length > 0;

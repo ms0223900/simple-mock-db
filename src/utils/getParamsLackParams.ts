@@ -1,7 +1,7 @@
 const getParamsLackParams = (
   paramsFromReq: Record<string, string | undefined>, paramsRequireObj: Record<string, {
     isRequired: boolean
-  }>) => {
+  }>): string[] => {
   const lackParams = [];
   for (const paramKey in paramsRequireObj) {
     const property = paramsFromReq[paramKey];

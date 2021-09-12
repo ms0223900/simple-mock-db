@@ -11,7 +11,11 @@ const articleList: SingleArticle[] = [
   {
     id: 2,
     title: 'Hello-2'
-  }
+  },
+  {
+    id: 3,
+    title: 'Hello-2'
+  },
 ];
 
 export default articleList;

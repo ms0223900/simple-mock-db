@@ -1,4 +1,8 @@
-import SchmeaParser, { DataTypeInput, ParsedGetterInput } from "./SchemaParser";
+import _ from 'lodash';
+import getRandomNumberByRange from './getRandomNumberByRange';
+import MakeDataListHelpers from './MakeDataListHelpers';
+import RandomDataListGetter from './RandomDataListGetter';
+import SchemaParser, { DataTypeInput, ParsedGetterInput } from "./SchemaParser";
 
 export interface TypeAndGetter {
   type: DataTypeInput
@@ -7,6 +11,15 @@ export interface TypeAndGetter {
 
 export interface KeyWithParsedTypeAndGetter extends TypeAndGetter {
   key: string
+}
+
+export interface ObjectArrayDataByGetterParams {
+  idx: number
+  amout?: number
+  dataType: TypeAndGetter['type']
+  getter: TypeAndGetter['getter']
+  otherResolverList: Record<string, any>
+  otherResolver: Resolver<any>
 }
 
 class Resolver<Data extends Record<string, any>> {
@@ -18,22 +31,22 @@ class Resolver<Data extends Record<string, any>> {
     this.data = [];
   }
 
-  async getObjectDataByGetter(
-    idx: number,
-    getter: ParsedGetterInput,
-    otherResolverList: any, 
-    resolver: Resolver<any>
-  ): Promise<any | null> {
+  async getObjectDataByGetter({
+    idx,
+    getter,
+    otherResolver,
+    otherResolverList,
+  }: ObjectArrayDataByGetterParams): Promise<any | null> {
     const {
       key,
       otherResolverKey,
-    } = SchmeaParser.parseParam(getter.param);
+    } = SchemaParser.parseParam(getter.param);
     switch (getter.type) {
       case 'find':
         if(getter.condition === 'eq') {
           // console.log(this.data[idx]);
           const val = this.data[idx] ? this.data[idx][key] : undefined;
-          const dataFromOtherResolver = await resolver.get(otherResolverList);
+          const dataFromOtherResolver = await otherResolver.get(otherResolverList);
           // console.log(dataFromOtherResolver, val);
           if(Array.isArray(dataFromOtherResolver)) {
             const found = dataFromOtherResolver.find(d => (
@@ -49,20 +62,55 @@ class Resolver<Data extends Record<string, any>> {
     }
   }
 
+  async getArrayDataByGetter({
+    amout,
+    dataType,
+    getter,
+    otherResolver,
+    otherResolverList,
+  }: ObjectArrayDataByGetterParams): Promise<any[]> {
+    switch (getter.type) {
+      case 'get':
+        if(getter.condition === 'random') {
+          const {
+            specificTypeProperty
+          } = dataType;
+          const {
+            min,
+            max,
+          } = SchemaParser.parseRangeParam(getter.param);
+
+          const amount = Number(max);
+          const dataList = await otherResolver.get(otherResolverList, amount);
+          let res = RandomDataListGetter.getByRange(dataList, { min, max });
+          // check property exist
+          if(specificTypeProperty && res[0] && res[0][specificTypeProperty]) {
+            res = res.map(r => ({
+              [specificTypeProperty]: r[specificTypeProperty]
+            }));
+          }
+          return res;
+        }
+        return [];
+      default:
+        return [];
+    }
+
+    // return [];
+  }
+
   resolveSingleData(otherResolverList: any, idx: number) {
     return async ({
       type: dataType,
       getter
     }: TypeAndGetter): Promise<any | null> => {
       // console.log(dataType.dataType);
+      const otherResolver = otherResolverList[dataType.specificType];
       switch (dataType.dataType) {
         case 'object': {
-          const otherResolver = otherResolverList[dataType.specificType];
-          if(otherResolver) {
-            // get data from other otherResolver
-            return await this.getObjectDataByGetter(idx, getter, otherResolverList, otherResolver); 
-          }
-          return null;
+          return await this.getObjectDataByGetter({ 
+            idx, dataType, getter, otherResolverList, otherResolver 
+          }); 
         }
         
         case 'number':
@@ -72,7 +120,9 @@ class Resolver<Data extends Record<string, any>> {
           return 'test str';
 
         case 'array':
-          return [];
+          return await this.getArrayDataByGetter({
+            idx, dataType, getter, otherResolverList, otherResolver 
+          });
 
         default:
           return null;
@@ -80,7 +130,7 @@ class Resolver<Data extends Record<string, any>> {
     };
   }
 
-  async getSingle(otherResolverList: any, idx: number, condition?: Record<string, any>, ): Promise<Data> {
+  async getSingleData(otherResolverList: any, idx: number, condition?: Record<string, any>, ): Promise<Data> {
     let res = {} as Data;
     const resolveSingleDataFn = this.resolveSingleData(otherResolverList, idx);
 
@@ -116,7 +166,7 @@ class Resolver<Data extends Record<string, any>> {
     let res: Data[] = [];
     let idx = 0;
     for await (const iterator of Array(amount).fill(0)) {
-      const singleData = await this.getSingle(otherResolverList, idx);
+      const singleData = await this.getSingleData(otherResolverList, idx);
       res = [...res, singleData];
       idx += 1;
     }
