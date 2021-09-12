@@ -130,7 +130,7 @@ class Resolver<Data extends Record<string, any>> {
     };
   }
 
-  async getSingleData(otherResolverList: any, idx: number, condition?: Record<string, any>, ): Promise<Data> {
+  async getSingleData(otherResolverList: any, idx: number, givenKeyVal?: Record<string, any>, ): Promise<Data> {
     let res = {} as Data;
     const resolveSingleDataFn = this.resolveSingleData(otherResolverList, idx);
 
@@ -147,26 +147,26 @@ class Resolver<Data extends Record<string, any>> {
       this.data[idx] = res;
     }
 
-    if(condition) {
-      for (const conditionKey in condition) {
-        if(res[conditionKey]) {
-          res = {
-            ...res,
-            [conditionKey]: condition[conditionKey],
-          };
-        }
-      }
-    }
-    // console.log(res);
-
     return res;
   }
 
-  async get(otherResolverList: any, amount = 3): Promise<Data[]> {
+  async get(otherResolverList: any, amount = 3, givenKeyVal?: Record<string, any>): Promise<Data[]> {
     let res: Data[] = [];
     let idx = 0;
     for await (const iterator of Array(amount).fill(0)) {
-      const singleData = await this.getSingleData(otherResolverList, idx);
+      let singleData = await this.getSingleData(otherResolverList, idx, givenKeyVal);
+
+      if(givenKeyVal) {
+        for (const key in givenKeyVal) {
+          if(typeof singleData[key] !== 'undefined') {
+            singleData = {
+              ...singleData,
+              [key]: givenKeyVal[key],
+            };
+          }
+        }
+      }
+
       res = [...res, singleData];
       idx += 1;
     }

@@ -120,9 +120,22 @@ const registerServerHandlers = () => {
         // const data = await asyncGetStaticData(parsedPath.path, res);
         let amount = (query.limit && !Number.isNaN(Number(query.limit))) ? Number(query.limit) : undefined;
         amount = (amount === -1) ? MAX_DATA_LIST_AMOUNT : amount;
-        const data = await allResolvers[pathName].get(allResolvers, amount);
+        let givenKeyValues: Record<string, any> = {};
+        
+        if(params.id) {
+          amount = 1;
+          givenKeyValues = {
+            ...givenKeyValues,
+            id: Number(params.id)
+          };
+        }
 
-        if(data) {
+        const data = await allResolvers[pathName].get(allResolvers, amount, givenKeyValues);
+        if(Object.keys(givenKeyValues).length > 0) {
+          return res.send(data);
+        }
+
+        if(data.length > 0) {
           const haveParams = Object.keys(params).length > 0;
           if(!haveParams) 
             return res.send(data);
