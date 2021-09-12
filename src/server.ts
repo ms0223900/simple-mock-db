@@ -7,6 +7,8 @@ import parsePath from './utils/parsePath';
 import asyncGetStaticData from './utils/asyncGetStaticData';
 import getParamsLackParams from './utils/getParamsLackParams';
 import compareParamValue from './utils/compareParamValue';
+import Resolver from './utils/Resolver';
+import SchmeaParser from './utils/SchemaParser';
 
 const port = process.env.PORT || 3000;
 const server = jsonServer.create();
@@ -22,11 +24,13 @@ type RouteResFn<ReqHandledRes> = (res: Response, reqHandledRes?: ReqHandledRes) 
 
 export interface SingleRoute<HandledReqResult extends any = any> {
   path: string
-  pathName?: string
+  pathName: string
   method?: ServerMethod
 
   reqFn?: (req: Request) => any
   resFn?: RouteResFn<HandledReqResult>
+
+  schema?: Record<string, any>
 }
 
 const makeServerHomepage = (routes: SingleRoute[]) => {
@@ -57,6 +61,27 @@ const makeServerHomepage = (routes: SingleRoute[]) => {
 const registerServerHandlers = () => {
   const homepageStr = makeServerHomepage(routes);
   const homepage = routes.find(r => r.path === '/');
+  let allResolvers: Record<string, any> = {};
+
+  routes.forEach(({
+    path,
+    schema,
+    pathName
+  }) => {
+    const resolver = schema ? new Resolver(
+      SchmeaParser.parseSchema(schema)
+    ) : {
+      async get() {
+        const parsedPath = parsePath(path);
+        return await asyncGetStaticData(parsedPath.path);
+      }
+    };
+    // console.log(resolver);
+    allResolvers = {
+      ...allResolvers,
+      [pathName]: resolver,
+    };
+  });
 
   if(homepage) {
     server.get(homepage.path, (req, res) => {
@@ -65,22 +90,32 @@ const registerServerHandlers = () => {
   }
 
   routes.forEach(route => {
-    server[route.method || defaultServerMethod](route.path, async (req, res) => {
-      const handledReqResult = route.reqFn && route.reqFn(req);
-      if(route.resFn) {
-        route.resFn(res, handledReqResult);
+    const {
+      method,
+      schema,
+      path,
+      pathName,
+      reqFn,
+      resFn,
+    } = route;
+
+    server[method || defaultServerMethod](path, async (req, res) => {
+      const handledReqResult = reqFn && reqFn(req);
+      if(resFn) {
+        resFn(res, handledReqResult);
       } else {
         const {
           params,
         } = req;
 
-        const parsedPath = parsePath(route.path);
+        const parsedPath = parsePath(path);
         const lackParams = getParamsLackParams(params, parsedPath.params);
         if(lackParams.length > 0) {
           res.status(404).send(`Param: ${lackParams.join(', ')} is required`);
         }
         
-        const data = await asyncGetStaticData(parsedPath.path, res);
+        // const data = await asyncGetStaticData(parsedPath.path, res);
+        const data = await allResolvers[pathName].get(allResolvers);
 
         if(data) {
           const haveParams = Object.keys(params).length > 0;

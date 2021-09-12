@@ -23,7 +23,8 @@ const asyncGetStaticData = async (path: string, res?: Response) => {
     // });
     return data;
   } catch (error) {
-    res && res.status(404).send(getErrMessage(path));
+    throw new Error(getErrMessage(path));
+    // res && res.status(404).send(getErrMessage(path));
   }
 };
 
