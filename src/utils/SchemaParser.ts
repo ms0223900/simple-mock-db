@@ -1,3 +1,5 @@
+import { DataType, DataTypeInput, GetterInput } from "@/types";
+
 export const SchemaParserRegExps = {
   paramSplitter: ':',
   conditionSplitter: '.',
@@ -6,31 +8,19 @@ export const SchemaParserRegExps = {
   rangeParamConnector: /\s*-\s*/g,
 };
 
-export interface DataTypeInput {
-  dataType: string
-  specificType: string
-  specificTypeProperty?: string
-}
-
-export interface ParsedGetterInput {
-  type: string
-  condition: string
-  param: any
-}
-
 export interface TypeAndGetter {
   type: DataTypeInput
-  getter: ParsedGetterInput
+  getter: GetterInput
 }
 
 export interface KeyWithParsedTypeAndGetter extends TypeAndGetter {
   key: string
 }
 
-const SchmeaParser = {
+const SchemaParser = {
   parseDataType(dataTypeStr: string): DataTypeInput {
     let res: DataTypeInput = {
-      dataType: '',
+      dataType: DataType.string,
       specificType: '',
       specificTypeProperty: undefined,
     };
@@ -40,7 +30,7 @@ const SchmeaParser = {
       dataType,
       rawSpecificType,
     ] = devided;
-    res.dataType = dataType;
+    res.dataType = dataType as DataType;
 
     if(rawSpecificType) {
       const [
@@ -58,7 +48,7 @@ const SchmeaParser = {
     return res;
   },
 
-  parseGetter(getterInput: string | any[] | undefined): ParsedGetterInput {
+  parseGetter(getterInput: string | any[] | undefined): GetterInput {
     if(!getterInput) {
       return ({
         type: 'get',
@@ -137,4 +127,4 @@ const SchmeaParser = {
   }
 };
 
-export default SchmeaParser;
+export default SchemaParser;

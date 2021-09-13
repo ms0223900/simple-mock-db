@@ -1,12 +1,14 @@
+import { defaultPlugins } from '@/config';
+import { DataType, DataTypeInput, GetterInput, PluginsByDataType, SinglePlugin } from '@/types';
 import _ from 'lodash';
 import getRandomNumberByRange from './getRandomNumberByRange';
 import MakeDataListHelpers from './MakeDataListHelpers';
 import RandomDataListGetter from './RandomDataListGetter';
-import SchemaParser, { DataTypeInput, ParsedGetterInput } from "./SchemaParser";
+import SchemaParser from "./SchemaParser";
 
 export interface TypeAndGetter {
   type: DataTypeInput
-  getter: ParsedGetterInput
+  getter: GetterInput
 }
 
 export interface KeyWithParsedTypeAndGetter extends TypeAndGetter {
@@ -25,10 +27,27 @@ export interface ObjectArrayDataByGetterParams {
 class Resolver<Data extends Record<string, any>> {
   keyWithParsedTypeAndGetterList: KeyWithParsedTypeAndGetter[]
   data: Data[]
+  pluginsByDataType: PluginsByDataType
 
-  constructor(keyWithParsedTypeAndGetterList: KeyWithParsedTypeAndGetter[]) {
+  constructor(
+    keyWithParsedTypeAndGetterList: KeyWithParsedTypeAndGetter[], 
+    plugins?: Partial<PluginsByDataType>
+  ) {
     this.keyWithParsedTypeAndGetterList = keyWithParsedTypeAndGetterList;
     this.data = [];
+    this.pluginsByDataType = {
+      ...defaultPlugins,
+      ...plugins,
+    };
+  }
+
+  setPlugins(plugins: Partial<PluginsByDataType>) {
+    this.pluginsByDataType = {
+      ...this.pluginsByDataType,
+      ...plugins,
+    };
+    // console.log(this.pluginsByDataType);
+    return this;
   }
 
   async getObjectDataByGetter({
@@ -99,6 +118,25 @@ class Resolver<Data extends Record<string, any>> {
     // return [];
   }
 
+  private resolveByPlugins( dataTypeInput: DataTypeInput, getterInput: GetterInput, ) {
+    return (plugins: SinglePlugin[],) => {
+      // console.log(this.pluginsByDataType);
+      for (const plugin of plugins) {
+        const {
+          dataType,
+          specificType,
+          getterFn,
+        } = plugin;
+    
+        if(dataType === dataTypeInput.dataType && specificType === dataTypeInput.specificType) {
+          return getterFn(getterInput);
+        } 
+      }
+  
+      return undefined;
+    };
+  }
+
   resolveSingleData(otherResolverList: any, idx: number) {
     return async ({
       type: dataType,
@@ -106,6 +144,8 @@ class Resolver<Data extends Record<string, any>> {
     }: TypeAndGetter): Promise<any | null> => {
       // console.log(dataType.dataType);
       const otherResolver = otherResolverList[dataType.specificType];
+      const resolveByPluginsFn = this.resolveByPlugins(dataType, getter);
+
       switch (dataType.dataType) {
         case 'object': {
           return await this.getObjectDataByGetter({ 
@@ -113,11 +153,17 @@ class Resolver<Data extends Record<string, any>> {
           }); 
         }
         
-        case 'number':
+        case 'number': {
+          const resolved = resolveByPluginsFn(this.pluginsByDataType.number);
+          if(typeof resolved === 'number') return resolved;
           return idx;
+        }
 
-        case 'string':
+        case 'string': {
+          const resolved = resolveByPluginsFn(this.pluginsByDataType.string);
+          if(typeof resolved === 'string') return resolved;
           return 'test str';
+        }
 
         case 'array':
           return await this.getArrayDataByGetter({
@@ -130,7 +176,7 @@ class Resolver<Data extends Record<string, any>> {
     };
   }
 
-  async getSingleData(otherResolverList: any, idx: number, givenKeyVal?: Record<string, any>, ): Promise<Data> {
+  async getSingleData(otherResolverList: any, idx: number): Promise<Data> {
     let res = {} as Data;
     const resolveSingleDataFn = this.resolveSingleData(otherResolverList, idx);
 
@@ -154,7 +200,7 @@ class Resolver<Data extends Record<string, any>> {
     let res: Data[] = [];
     let idx = 0;
     for await (const iterator of Array(amount).fill(0)) {
-      let singleData = await this.getSingleData(otherResolverList, idx, givenKeyVal);
+      let singleData = await this.getSingleData(otherResolverList, idx);
 
       if(givenKeyVal) {
         for (const key in givenKeyVal) {

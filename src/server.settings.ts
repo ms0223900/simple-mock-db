@@ -1,4 +1,4 @@
-import { SingleRoute } from "./server";
+import { SingleRoute } from "./types";
 import asyncGetStaticData from "./utils/asyncGetStaticData";
 
 const routes: SingleRoute[] = [
@@ -54,7 +54,7 @@ const routes: SingleRoute[] = [
     pathName: 'User',
     schema: {
       id: ['number:seq', 'get.eq:idx'],
-      name: ['string:lorem', 'get.limit:5-10'],
+      name: ['string:lorem-zh', 'get.limit:5-10'],
       intro: ['string:list', [
         'abc',
         'cde',

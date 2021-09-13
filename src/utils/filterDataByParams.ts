@@ -15,6 +15,7 @@ const filterDataByParams = <Data extends Record<string, any>>(
     }
     return true;
   });
+  // console.log(params);
   
   return filtered;
 };
