@@ -10,6 +10,10 @@ import compareParamValue from './utils/compareParamValue';
 import Resolver from './utils/Resolver';
 import SchmeaParser from './utils/SchemaParser';
 import { MAX_DATA_LIST_AMOUNT } from './config';
+import { SinglePlugin } from './types';
+import ExceptionChecker from './utils/ExceptionChecker';
+import getQueryAmount from './utils/getQueryAmount';
+import filterDataByParams from './utils/filterDataByParams';
 
 const port = process.env.PORT || 3000;
 const server = jsonServer.create();
@@ -59,113 +63,146 @@ const makeServerHomepage = (routes: SingleRoute[]) => {
   );
 };
 
-const registerServerHandlers = () => {
-  const homepageStr = makeServerHomepage(routes);
-  const homepage = routes.find(r => r.path === '/');
-  let allResolvers: Record<string, Resolver<any>> = {};
+class MockServer {
+  server = server
+  port = port
+  routeList: SingleRoute[]
+  resolvers: Record<string, Resolver<any>>
+  pluginList: SinglePlugin[]
 
-  routes.forEach(({
-    path,
-    schema,
-    pathName
-  }) => {
-    const resolver = schema ? new Resolver(
-      SchmeaParser.parseSchema(schema)
-    ) : {
+  constructor({
+    routeList,
+    pluginList
+  }: {
+    routeList: SingleRoute[]
+    pluginList?: SinglePlugin[]
+  }) {
+    this.resolvers = {};
+    this.routeList = routeList;
+    this.pluginList = pluginList || [];
+  }
+
+  addRoute(route: SingleRoute) {
+    this.routeList.push(route);
+    this.registerRoute(route);
+    return this;
+  }
+
+  addResolver({ schema, path, pathName }: Pick<SingleRoute, 'schema' | 'path' | 'pathName'>) {
+    let resolver = {
       async get() {
         const parsedPath = parsePath(path);
         return await asyncGetStaticData(parsedPath.path);
       } 
     } as unknown as Resolver<any>;
-    // console.log(resolver);
-    allResolvers = {
-      ...allResolvers,
+
+    if(schema) {
+      resolver = new Resolver(
+        SchmeaParser.parseSchema(schema)
+      );
+    } 
+
+    this.resolvers = {
+      ...this.resolvers,
       [pathName]: resolver,
     };
-  });
-
-  if(homepage) {
-    server.get(homepage.path, (req, res) => {
-      res.send(homepageStr);
-    });
   }
 
-  routes.forEach(route => {
-    const {
-      method,
-      schema,
-      path,
-      pathName,
-      reqFn,
-      resFn,
-    } = route;
+  private registerRoute({
+    method,
+    path,
+    pathName,
+    reqFn,
+    resFn
+  }: SingleRoute) {
+    this.server[method || defaultServerMethod](path, async(req, res) => {
+      const parsedPath = parsePath(path);
+      const exceptionChecker = new ExceptionChecker(res);
 
-    server[method || defaultServerMethod](path, async (req, res) => {
-      const handledReqResult = reqFn && reqFn(req);
-      if(resFn) {
-        resFn(res, handledReqResult);
-      } else {
+      try {
+        const handledReqResult = reqFn && reqFn(req);
+        if(resFn) {
+          resFn(res, handledReqResult);
+          return this;
+        }
+        
         const {
           params,
           query,
         } = req;
-        // console.log(query);
-
-        const parsedPath = parsePath(path);
-        const lackParams = getParamsLackParams(params, parsedPath.params);
-        if(lackParams.length > 0) {
-          res.status(404).send(`Param: ${lackParams.join(', ')} is required`);
-        }
+        exceptionChecker.checkParamsLack(path, params);
         
-        // const data = await asyncGetStaticData(parsedPath.path, res);
-        let amount = (query.limit && !Number.isNaN(Number(query.limit))) ? Number(query.limit) : undefined;
-        amount = (amount === -1) ? MAX_DATA_LIST_AMOUNT : amount;
-        let givenKeyValues: Record<string, any> = {};
-        
-        if(params.id) {
-          amount = 1;
-          givenKeyValues = {
-            ...givenKeyValues,
-            id: Number(params.id)
-          };
+        const queryAmount = getQueryAmount(query.limit as string, params.id);
+        const givenKeyValues = params.id ? {
+          id: Number(params.id)
+        } : {};
+
+        const resolver = this.resolvers[pathName];
+        const data = await resolver.get(this.resolvers, queryAmount, givenKeyValues);
+        exceptionChecker.checkDataExist(data, parsedPath.path);
+
+        if(
+          Object.keys(givenKeyValues).length > 0 || 
+          Object.keys(params).length === 0
+        ) {
+          res.send(data);
+          return this;
         }
 
-        const data = await allResolvers[pathName].get(allResolvers, amount, givenKeyValues);
-        if(Object.keys(givenKeyValues).length > 0) {
-          return res.send(data);
-        }
+        const filteredData = filterDataByParams(data, parsedPath.params);
+        res.send(filteredData);
+        // return this;
 
-        if(data.length > 0) {
-          const haveParams = Object.keys(params).length > 0;
-          if(!haveParams) 
-            return res.send(data);
-          if(Array.isArray(data)) {
-
-            const filtered = data.filter((d: Record<string, any>) => {
-              let found = true;
-              for (const paramKey in parsedPath.params) {
-                const property = d[paramKey];
-                const paramFromReq = params[paramKey] as string | undefined;
-                // console.log(property, paramFromReq);
-                if(!compareParamValue(paramFromReq, property)) {
-                  found = false;
-                }
-              }
-              return found;
-            });
-
-            res.send(filtered);
-          }
-        } else {
-          res.status(404).send(`No ${parsedPath.path} data found :(`);
-        }
+      } catch (error: any) {
+        console.log(error);
+        exceptionChecker.sendErrMessage(error.status, error.message);
       }
     });
-  });
 
-  server.listen(port, () => {
-    console.log(`Listen at http://localhost:${port}`);
-  });
-};
+    return this;
+  }
 
-registerServerHandlers();
+  addPlugin(plugin: SinglePlugin) {
+    this.pluginList.push(plugin);
+
+    return this;
+  }
+
+  private serveHomePage() {
+    const homepageStr = makeServerHomepage(this.routeList);
+    const homepageRoute = routes.find(r => (
+      r.path === '/' || r.pathName.toLowerCase() === 'HomePage'.toLowerCase()
+    ));
+    if(homepageRoute) {
+      server.get(homepageRoute.path, (req, res) => {
+        res.send(homepageStr);
+      });
+    }
+  }
+
+  private init() {
+    this.serveHomePage();
+    this.routeList.forEach(r => {
+      this.addResolver(r);
+    });
+    this.routeList.forEach(route => {
+      this.registerRoute(route);
+    });
+  }
+
+  serve() {
+    this.init();
+    this.server.listen(this.port, () => {
+      console.log(`Listen at http://localhost:${port}`);
+    });
+  }
+}
+
+const mockServer = new MockServer({
+  routeList: routes,
+});
+
+mockServer  
+  .serve();
+
+// registerServerHandlers();
