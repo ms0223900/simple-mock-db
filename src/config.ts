@@ -4,6 +4,7 @@ export const DEFAULT_DATA_LIST_AMOUNT = 10;
 export const MAX_DATA_LIST_AMOUNT = 100;
 
 export const defaultPlugins: PluginsByDataType = {
+  boolean: [],
   string: [],
   number: [],
   object: [],

@@ -18,6 +18,7 @@ export interface SingleRoute<HandledReqResult extends any = any> {
 }
 
 export enum DataType {
+  'boolean' = 'boolean',
   'string' = 'string',
   'number' = 'number',
   'object' = 'object',
@@ -40,8 +41,13 @@ export interface GetterInput {
 
 export interface SinglePlugin extends DataTypeInput {
   name: string
-  getterFn: (getter: GetterInput) => any
+  getterFn: (getterResolvers: Record<string, SingleGetterResolver>, getter: GetterInput, idx: number) => any
 }
 
 
 export type PluginsByDataType = Record<DataType, SinglePlugin[]>
+
+export interface SingleGetterResolver {
+  name: string
+  resolveByGetterInput: (getter: GetterInput) => any
+}

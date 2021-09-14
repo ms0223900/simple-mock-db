@@ -1,4 +1,5 @@
-import { DataType, SinglePlugin } from "@/types";
+import { RandomValGetterResolverOutput } from "@/getterResolvers/RandomValGetterResolver";
+import { DataType, SingleGetterResolver, SinglePlugin } from "@/types";
 import getRandomNumberByRange from "@/utils/getRandomNumberByRange";
 import SchemaParser from "@/utils/SchemaParser";
 
@@ -16,20 +17,15 @@ const LoremZhPlugin: SinglePlugin = {
   name: 'LoremZh',
   dataType: DataType.string,
   specificType: 'lorem-zh',
-  getterFn: ({
-    type,
-    condition,
-    param,
-  }) => {
-    if(type === 'get' && condition === 'limit') {
+  getterFn: (getterResolvers, getter) => {
+    const randomGetterResolver = getterResolvers['randomGetter'] as SingleGetterResolver;
+    const resolved = randomGetterResolver.resolveByGetterInput(getter)(loremZh.trim().length) as RandomValGetterResolverOutput;
+    
+    if(resolved) {
       const {
-        min, max,
-      } = SchemaParser.parseRangeParam(param);
-
-      const randomRange = getRandomNumberByRange(min, max);
-      const startIdx = getRandomNumberByRange(0, (loremZh.trim().length / 2) - randomRange);
-      // console.log(startIdx);
-      return loremZh.trim().slice(startIdx, startIdx + randomRange);
+        startIdx, endIdx,
+      } = resolved;
+      return loremZh.trim().slice(startIdx, endIdx);
     }
     return loremZh.slice(0, 20);
   }

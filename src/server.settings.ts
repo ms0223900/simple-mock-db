@@ -20,7 +20,7 @@ const routes: SingleRoute[] = [
         'number:seq', 'get.eq:idx',
       ],
       title: [
-        'string',
+        'string:lorem-zh',
       ],
       content: [
         'string',
@@ -68,6 +68,10 @@ const routes: SingleRoute[] = [
       sharedArticleList: [
         'array:Article',
         'get.random:2-5' // get randomily(choose 2 ~ 10, )
+      ],
+      createdAt: [
+        'string:date',
+        'get.ascByIdx:idx/4'
       ]
     }
   }

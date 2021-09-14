@@ -1,5 +1,5 @@
 import { defaultPlugins } from '@/config';
-import { DataType, DataTypeInput, GetterInput, PluginsByDataType, SinglePlugin } from '@/types';
+import { DataType, DataTypeInput, GetterInput, PluginsByDataType, SingleGetterResolver, SinglePlugin } from '@/types';
 import _ from 'lodash';
 import getRandomNumberByRange from './getRandomNumberByRange';
 import MakeDataListHelpers from './MakeDataListHelpers';
@@ -28,10 +28,12 @@ class Resolver<Data extends Record<string, any>> {
   keyWithParsedTypeAndGetterList: KeyWithParsedTypeAndGetter[]
   data: Data[]
   pluginsByDataType: PluginsByDataType
+  getterResolvers: Record<string, SingleGetterResolver>
 
   constructor(
     keyWithParsedTypeAndGetterList: KeyWithParsedTypeAndGetter[], 
-    plugins?: Partial<PluginsByDataType>
+    plugins?: Partial<PluginsByDataType>,
+    getterResolvers?: Record<string, SingleGetterResolver>
   ) {
     this.keyWithParsedTypeAndGetterList = keyWithParsedTypeAndGetterList;
     this.data = [];
@@ -39,12 +41,24 @@ class Resolver<Data extends Record<string, any>> {
       ...defaultPlugins,
       ...plugins,
     };
+    this.getterResolvers = {
+      ...getterResolvers,
+    };
   }
 
-  setPlugins(plugins: Partial<PluginsByDataType>) {
+  setPlugins(plugins: Partial<PluginsByDataType>): this {
     this.pluginsByDataType = {
       ...this.pluginsByDataType,
       ...plugins,
+    };
+    // console.log(this.pluginsByDataType);
+    return this;
+  }
+
+  setGetterResolvers(getterResolvers: Record<string, SingleGetterResolver>): this {
+    this.getterResolvers = {
+      ...this.getterResolvers,
+      ...getterResolvers,
     };
     // console.log(this.pluginsByDataType);
     return this;
@@ -118,8 +132,12 @@ class Resolver<Data extends Record<string, any>> {
     // return [];
   }
 
-  private resolveByPlugins( dataTypeInput: DataTypeInput, getterInput: GetterInput, ) {
-    return (plugins: SinglePlugin[],) => {
+  private resolveByPlugins(
+    dataTypeInput: DataTypeInput, 
+    getterInput: GetterInput,
+    idx: number,
+  ) {
+    return (plugins: SinglePlugin[]) => {
       // console.log(this.pluginsByDataType);
       for (const plugin of plugins) {
         const {
@@ -129,7 +147,11 @@ class Resolver<Data extends Record<string, any>> {
         } = plugin;
     
         if(dataType === dataTypeInput.dataType && specificType === dataTypeInput.specificType) {
-          return getterFn(getterInput);
+          return getterFn(
+            this.getterResolvers,
+            getterInput, 
+            idx,
+          );
         } 
       }
   
@@ -144,7 +166,7 @@ class Resolver<Data extends Record<string, any>> {
     }: TypeAndGetter): Promise<any | null> => {
       // console.log(dataType.dataType);
       const otherResolver = otherResolverList[dataType.specificType];
-      const resolveByPluginsFn = this.resolveByPlugins(dataType, getter);
+      const resolveByPluginsFn = this.resolveByPlugins(dataType, getter, idx);
 
       switch (dataType.dataType) {
         case 'object': {

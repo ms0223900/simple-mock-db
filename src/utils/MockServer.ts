@@ -1,6 +1,6 @@
 import { defaultPlugins, defaultServerMethod, port } from "@/config";
 import { server } from "@/server";
-import { PluginsByDataType, SinglePlugin, SingleRoute } from "@/types";
+import { PluginsByDataType, SingleGetterResolver, SinglePlugin, SingleRoute } from "@/types";
 import asyncGetStaticData from "./asyncGetStaticData";
 import ExceptionChecker from "./ExceptionChecker";
 import filterDataByParams from "./filterDataByParams";
@@ -40,13 +40,16 @@ class MockServer {
   routeList: SingleRoute[]
   resolvers: Record<string, Resolver<any>>
   pluginsByDataType: PluginsByDataType
+  getterResolvers: Record<string, SingleGetterResolver>
 
   constructor({
     routeList,
-    plugins
+    plugins,
+    getterResolvers,
   }: {
     routeList: SingleRoute[]
-    plugins?: Partial<PluginsByDataType>
+    plugins?: Partial<PluginsByDataType>,
+    getterResolvers?: Record<string, SingleGetterResolver>
   }) {
     this.resolvers = {};
     this.routeList = routeList;
@@ -54,13 +57,16 @@ class MockServer {
       ...defaultPlugins,
       ...plugins,
     };
+    this.getterResolvers = {
+      ...getterResolvers
+    };
     
     this.routeList.forEach(r => {
       this.addResolver(r);
     });
   }
 
-  addRoute(route: SingleRoute) {
+  addRoute(route: SingleRoute): this {
     this.routeList.push(route);
     this.registerRoute(route);
     return this;
@@ -85,7 +91,7 @@ class MockServer {
       [pathName]: resolver,
     };
 
-    this.setPluginsToResolvers();
+    this.syncToResolvers();
   }
 
   private registerRoute({
@@ -142,14 +148,17 @@ class MockServer {
     return this;
   }
 
-  private setPluginsToResolvers(): void {
+  private syncToResolvers(): void {
     for (const key in this.resolvers) {
       const resolver = this.resolvers[key];
       resolver.setPlugins && resolver.setPlugins(this.pluginsByDataType);
+      resolver.setGetterResolvers && resolver.setGetterResolvers(
+        this.getterResolvers
+      );
     }
   }
 
-  addPlugin(plugin: SinglePlugin) {
+  addPlugin(plugin: SinglePlugin): this {
     const {
       dataType,
     } = plugin;
@@ -161,8 +170,19 @@ class MockServer {
         plugin,
       ]
     };
-    this.setPluginsToResolvers();
+    this.syncToResolvers();
     
+    return this;
+  }
+
+  addGetterResolver(getterResolver: SingleGetterResolver): this {
+    const {
+      name
+    } = getterResolver;
+    this.getterResolvers = {
+      ...this.getterResolvers,
+      [name]: getterResolver,
+    };
     return this;
   }
 
