@@ -1,6 +1,6 @@
 import { defaultPlugins, defaultServerMethod, port } from "@/config";
 import { server } from "@/server";
-import { PluginsByDataType, SingleGetterResolver, SinglePlugin, SingleRoute } from "@/types";
+import { DataType, PluginsByDataType, SingleGetterResolver, SinglePlugin, SingleRoute } from "@/types";
 import asyncGetStaticData from "./asyncGetStaticData";
 import ExceptionChecker from "./ExceptionChecker";
 import filterDataByParams from "./filterDataByParams";
@@ -55,12 +55,12 @@ class MockServer {
     this.routeList = routeList;
     this.pluginsByDataType = {
       ...defaultPlugins,
-      ...plugins,
     };
     this.getterResolvers = {
       ...getterResolvers
     };
     
+    plugins && this.addPluginsByDataType(plugins);
     this.routeList.forEach(r => {
       this.addResolver(r);
     });
@@ -172,6 +172,16 @@ class MockServer {
     };
     this.syncToResolvers();
     
+    return this;
+  }
+
+  addPluginsByDataType(pluginsByDataType: Partial<PluginsByDataType>): this {
+    for (const dataType in pluginsByDataType) {
+      const plugins = pluginsByDataType[dataType as DataType];
+      plugins && plugins.forEach(plugin => {
+        this.addPlugin(plugin);
+      });
+    }
     return this;
   }
 

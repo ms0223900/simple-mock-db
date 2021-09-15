@@ -169,25 +169,31 @@ class Resolver<Data extends Record<string, any>> {
       const resolveByPluginsFn = this.resolveByPlugins(dataType, getter, idx);
 
       switch (dataType.dataType) {
-        case 'object': {
+        case DataType.boolean: {
+          return resolveByPluginsFn(this.pluginsByDataType.boolean);
+        }
+
+        case DataType.object: {
+          const resolved = resolveByPluginsFn(this.pluginsByDataType.object);
+          if(resolved) return resolved;
           return await this.getObjectDataByGetter({ 
             idx, dataType, getter, otherResolverList, otherResolver 
           }); 
         }
         
-        case 'number': {
+        case DataType.number: {
           const resolved = resolveByPluginsFn(this.pluginsByDataType.number);
           if(typeof resolved === 'number') return resolved;
           return idx;
         }
 
-        case 'string': {
+        case DataType.string: {
           const resolved = resolveByPluginsFn(this.pluginsByDataType.string);
           if(typeof resolved === 'string') return resolved;
           return 'test str';
         }
 
-        case 'array':
+        case DataType.array:
           return await this.getArrayDataByGetter({
             idx, dataType, getter, otherResolverList, otherResolver 
           });

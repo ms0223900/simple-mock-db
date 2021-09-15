@@ -6,6 +6,7 @@ import MockServer from './utils/MockServer';
 import SimpleEmailGenerator from './plugins/SimpleEmailGenerator.plugin';
 import BasicGetterResolvers from './getterResolvers/BasicGetterResolvers';
 import DateGenerator from './plugins/DateGenerator.plugin';
+import basicPlugins from './plugins';
 
 export const server = jsonServer.create();
 server.use(cors({
@@ -15,6 +16,7 @@ server.use(cors({
 
 const mockServer = new MockServer({
   routeList: routes,
+  plugins: basicPlugins,
   getterResolvers: BasicGetterResolvers
 });
 

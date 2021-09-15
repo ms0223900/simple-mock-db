@@ -46,6 +46,9 @@ const routes: SingleRoute[] = [
       ],
       someVal: [
         'string:lorem', 'get.limit:20-100'
+      ],
+      isPublished: [
+        'boolean', 'get.eq:true',
       ]
     }
   },
@@ -55,6 +58,9 @@ const routes: SingleRoute[] = [
     schema: {
       id: ['number:seq', 'get.eq:idx'],
       name: ['string:lorem-zh', 'get.limit:5-10'],
+      coverImg: [
+        'object:image', 'find.fakeImg:1_1',
+      ],
       intro: ['string:list', [
         'abc',
         'cde',
