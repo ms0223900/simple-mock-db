@@ -1,3 +1,4 @@
+import YearMonthDataHandler from "./handlers/YearMonthDataHandler";
 import { SingleRoute } from "./types";
 import asyncGetStaticData from "./utils/asyncGetStaticData";
 
@@ -32,10 +33,38 @@ const routes: SingleRoute[] = [
     pathName: 'Game',
     reqFn: (req) => 
       !Number.isNaN(Number(req.params.id)) ? Number(req.params.id) : undefined,
+    schema: {
+      id: [
+        'number:seq',
+      ],
+      title: [
+        'string:lorem-zh', 'get.limit:5-10',
+      ],
+      content: [
+        'string:lorem-zh', 'get.limit:30-100',
+      ],
+      createdAt: [
+        'object:Calendar', 'get'
+      ]
+    }
   } as SingleRoute<number>,
   {
     path: '/calendar/:year?/:month?',
     pathName: 'Calendar',
+    reqDataHandlers: [
+      YearMonthDataHandler,
+    ],
+    schema: {
+      year: [
+        'number:basic', 'get.ascByIdx:2021 + idx/4'
+      ],
+      month: [
+        'number:random', 'get.limit:1-12'
+      ],
+      date: [
+        'number:random', 'get.limit:1-30'
+      ]
+    }
   },
   {
     path: '/profile/:id?',
@@ -69,6 +98,7 @@ const routes: SingleRoute[] = [
       email: ['string:email', 'get.limit:6-10'],
       profile: [
         'object:Profile', // dataType:specificType
+        // id === userId
         'find.eq: id & userId', // getter(type, condition, param)
       ],
       sharedArticleList: [
@@ -78,6 +108,10 @@ const routes: SingleRoute[] = [
       createdAt: [
         'string:date',
         'get.ascByIdx:idx/4'
+      ],
+      sharedGameList: [
+        'array:Game',
+        'get.random:2-5'
       ]
     }
   }

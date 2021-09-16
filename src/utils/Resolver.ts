@@ -1,6 +1,7 @@
 import { defaultPlugins } from '@/config';
-import { DataType, DataTypeInput, GetterInput, PluginsByDataType, SingleGetterResolver, SinglePlugin } from '@/types';
+import { DataType, DataTypeInput, GetterInput, PluginsByDataType, SingleGetterResolver, SinglePlugin, SingleRoute } from '@/types';
 import _ from 'lodash';
+import genRandomDataFromArr from './genRandomDataFromArr';
 import getRandomNumberByRange from './getRandomNumberByRange';
 import MakeDataListHelpers from './MakeDataListHelpers';
 import RandomDataListGetter from './RandomDataListGetter';
@@ -74,24 +75,23 @@ class Resolver<Data extends Record<string, any>> {
       key,
       otherResolverKey,
     } = SchemaParser.parseParam(getter.param);
+    const dataFromOtherResolver = await otherResolver.get(otherResolverList);
+    // console.log(dataFromOtherResolver);
+
     switch (getter.type) {
       case 'find':
         if(getter.condition === 'eq') {
-          // console.log(this.data[idx]);
           const val = this.data[idx] ? this.data[idx][key] : undefined;
-          const dataFromOtherResolver = await otherResolver.get(otherResolverList);
-          // console.log(dataFromOtherResolver, val);
           if(Array.isArray(dataFromOtherResolver)) {
             const found = dataFromOtherResolver.find(d => (
               d[otherResolverKey] === val
             ));
             if(found) return found;
           }
-          return null;
         }
-        return null;
+        break;
       default:
-        return null;
+        return dataFromOtherResolver.length > 0 ? dataFromOtherResolver[0] : null;
     }
   }
 
@@ -159,7 +159,7 @@ class Resolver<Data extends Record<string, any>> {
     };
   }
 
-  resolveSingleData(otherResolverList: any, idx: number) {
+  resolveSingleData(otherResolverList: Record<string, Resolver<any>>, idx: number) {
     return async ({
       type: dataType,
       getter
@@ -167,6 +167,10 @@ class Resolver<Data extends Record<string, any>> {
       // console.log(dataType.dataType);
       const otherResolver = otherResolverList[dataType.specificType];
       const resolveByPluginsFn = this.resolveByPlugins(dataType, getter, idx);
+
+      if(Array.isArray(getter.param)) {
+        return genRandomDataFromArr(getter.param);
+      }
 
       switch (dataType.dataType) {
         case DataType.boolean: {
@@ -204,7 +208,7 @@ class Resolver<Data extends Record<string, any>> {
     };
   }
 
-  async getSingleData(otherResolverList: any, idx: number): Promise<Data> {
+  async getSingleData(otherResolverList: Record<string, Resolver<any>>, idx: number): Promise<Data> {
     let res = {} as Data;
     const resolveSingleDataFn = this.resolveSingleData(otherResolverList, idx);
 
@@ -224,7 +228,7 @@ class Resolver<Data extends Record<string, any>> {
     return res;
   }
 
-  async get(otherResolverList: any, amount = 3, givenKeyVal?: Record<string, any>): Promise<Data[]> {
+  async get(otherResolverList: Record<string, Resolver<any>>, amount = 3, givenKeyVal?: Record<string, any>): Promise<Data[]> {
     let res: Data[] = [];
     let idx = 0;
     for await (const iterator of Array(amount).fill(0)) {

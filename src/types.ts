@@ -3,10 +3,10 @@ import { Request, Response } from 'express';
 
 export type ServerMethod = 'all' | 'get' | 'post' | 'put' | 'delete' | 'patch' | 'options' | 'head'
 
-
+export type ReqDataHandler<Data> = (req: Request, dataList: Data[]) => Data[]
 type RouteResFn<ReqHandledRes> = (res: Response, reqHandledRes?: ReqHandledRes) => any
 
-export interface SingleRoute<HandledReqResult extends any = any> {
+export interface SingleRoute<HandledReqResult extends any = any, Data extends any = any> {
   path: string
   pathName: string
   method?: ServerMethod
@@ -14,7 +14,9 @@ export interface SingleRoute<HandledReqResult extends any = any> {
   reqFn?: (req: Request) => any
   resFn?: RouteResFn<HandledReqResult>
 
-  schema?: Record<string, any>
+  reqDataHandlers?: ReqDataHandler<Data>[]
+
+  schema?: Record<string, any> 
 }
 
 export enum DataType {

@@ -1,6 +1,7 @@
 import { defaultPlugins, defaultServerMethod, port } from "@/config";
 import { server } from "@/server";
 import { DataType, PluginsByDataType, SingleGetterResolver, SinglePlugin, SingleRoute } from "@/types";
+import { Request } from "express";
 import asyncGetStaticData from "./asyncGetStaticData";
 import ExceptionChecker from "./ExceptionChecker";
 import filterDataByParams from "./filterDataByParams";
@@ -94,12 +95,27 @@ class MockServer {
     this.syncToResolvers();
   }
 
+  private handleDataByReqDataHandlers<Data>(
+    req: Request,
+    reqDataHandlers: SingleRoute['reqDataHandlers'], 
+    dataList: Data[]
+  ): Data[] {
+    let res = [...dataList];
+    if(reqDataHandlers) {
+      reqDataHandlers.forEach(reqDataHandler => {
+        res = reqDataHandler(req, res);
+      });
+    }
+    return res;
+  }
+
   private registerRoute({
     method,
     path,
     pathName,
     reqFn,
-    resFn
+    resFn,
+    reqDataHandlers,
   }: SingleRoute) {
     this.server[method || defaultServerMethod](path, async(req, res) => {
       const parsedPath = parsePath(path);
@@ -135,8 +151,9 @@ class MockServer {
           return this;
         }
 
-        const filteredData = filterDataByParams(data, params);
-        res.send(filteredData);
+        // const filteredData = filterDataByParams(data, params);
+        const handledData = this.handleDataByReqDataHandlers(req, reqDataHandlers, data);
+        res.send(handledData);
         // return this;
 
       } catch (error: any) {

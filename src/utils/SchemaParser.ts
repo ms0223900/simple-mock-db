@@ -80,7 +80,14 @@ const SchemaParser = {
     });
   },
 
-  parseParam(paramStr: string) {
+  parseParam(paramStr?: string) {
+    if(!paramStr) {
+      return ({
+        key: '',
+        otherResolverKey: ''
+      });
+    }
+    
     const [
       key,
       otherResolverKey,
